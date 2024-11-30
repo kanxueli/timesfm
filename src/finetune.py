@@ -151,7 +151,7 @@ def finetune(
     ] = "google_timesfm_finetune",
 ) -> None:
     key = jax.random.PRNGKey(seed=RANDOM_SEED)
-    wandb.init(project=wandb_project, config=locals(), mode="offline")
+    wandb.init(project=wandb_project, config=locals(), mode="online")
 
     data_df = pd.read_csv(open(data_path, "r"))
 
@@ -190,16 +190,23 @@ def finetune(
     for tbatch in tqdm(train_batches.as_numpy_iterator()):
         break
     
+    # load timesfm in pax/jax version
     tfm = timesfm.TimesFm(
       hparams=timesfm.TimesFmHparams(
-          backend="gpu",
-          per_core_batch_size=32,      
-          horizon_len=horizon_len,
+        context_len=context_len,
+        horizon_len=horizon_len,
+        input_patch_len=INPUT_PATCH_LEN,
+        output_patch_len=OUTPUT_PATCH_LEN,
+        num_layers=NUM_LAYERS,
+        model_dims=MODEL_DIMS,
+        backend=backend,
+        per_core_batch_size=batch_size,
+        quantiles=QUANTILES,
       ),
       checkpoint=timesfm.TimesFmCheckpoint(
          version="jax",
          step=1100000,
-         path="/home/likx/time_series_forecasting/datasets_and_checkpoints/timesfm-1.0-200m/checkpoints/"),
+         path=checkpoint_path),
     )
     print("Loading Model Finish.")
     # tfm = TimesFm(
