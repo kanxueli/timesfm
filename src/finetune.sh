@@ -3,15 +3,17 @@
 # Script to finetune a model with specific configurations
 # Adjust the parameters below as needed. For a full list of options and descriptions, run the script with the --help flag.
 
+
 export TF_CPP_MIN_LOG_LEVEL=2 XLA_PYTHON_CLIENT_PREALLOCATE=false
 
-CUDA_VISIBLE_DEVICES=4,5,6,7 python3 finetune.py \
+# Note: current version don't support multi-GPU finetune
+CUDA_VISIBLE_DEVICES=4 python3 finetune.py \
     --model-name="google/timesfm-1.0-200m" \
     --checkpoint-path="/home/likx/time_series_forecasting/datasets_and_checkpoints/timesfm-1.0-200m/checkpoints/" \
     --backend="gpu" \
     --horizon-len=128 \
     --context-len=512 \
-    --batch-size=512 \
+    --batch-size=128 \
     --freq="15min" \
     --data-path="../datasets/ETT-small/ETTm1.csv" \
     --num-epochs=3 \

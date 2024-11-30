@@ -232,7 +232,7 @@ def finetune(
     #         checkpoint_type=checkpoints.CheckpointType.FLAX,
     #     )
 
-    model = pax_fiddle.Config(
+    model = pax_fiddle.Config( # model configuration in pax/jax version
         patched_decoder.PatchedDecoderFinetuneModel,
         name="patched_decoder_finetune",
         core_layer_tpl=tfm.model_p,
@@ -244,9 +244,10 @@ def finetune(
             model=model.core_layer_tpl,
             lora_rank=lora_rank,
             lora_target_modules=lora_target_modules,
-            use_dora=use_dora,
+            use_dora=use_dora, # weather lora + dora finetune
         )
 
+    # config trainable parameter
     @pax_fiddle.auto_config
     def build_learner() -> learners.Learner:
         bprop_variable_inclusion = []
@@ -290,10 +291,10 @@ def finetune(
     print(f"num_devices: {num_devices}")
     print(f"device kind: {jax.local_devices()[0].device_kind}")
 
-    task_p.model.ici_mesh_shape = [1, 1, num_devices]
+    task_p.model.ici_mesh_shape = [1, 1, 1] # Note: current version don't support multi-GPU finetune
     task_p.model.mesh_axis_names = ["replica", "data", "mdl"]
     print(jax.devices())
-    DEVICES = np.array(jax.devices()).reshape([1, 1, num_devices])
+    DEVICES = np.array(jax.devices()).reshape([1, 1, 1])
     jax.sharding.Mesh(DEVICES, ["replica", "data", "mdl"])
 
     jax_task = task_p
@@ -364,6 +365,7 @@ def finetune(
                 replicated_jax_states, train_prng_seed, tbatch
             )
             train_losses.append(step_fun_out.loss[0])
+            print("train_step_loss", step_fun_out.loss[0])
             wandb.log({"train_step_loss": step_fun_out.loss[0]})
 
         avg_train_loss = np.mean(train_losses)

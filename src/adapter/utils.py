@@ -352,12 +352,12 @@ def load_adapter_layer(
         tuple[pax_fiddle.Config, pax_fiddle.Config]: Updated model configurations.
     """
     original_linear_tpl = original_attn_tpl = original_combined_qkv_tpl = None
-    if lora_target_modules in ["all", "mlp"]:
+    if lora_target_modules in ["all", "mlp"]:   # fine-tune linear layer
         original_linear_tpl = (
             model.stacked_transformer_params_tpl.transformer_layer_params_tpl.tr_fflayer_tpl.fflayer_tpl.linear_tpl
         )
         adapter_linear_tpl = (
-            pax_fiddle.Config(
+            pax_fiddle.Config( 
                 DoraLinear,
                 rank=lora_rank,
             )
@@ -372,7 +372,7 @@ def load_adapter_layer(
             adapter_linear_tpl
         )
 
-    if lora_target_modules in ["all", "attention"]:
+    if lora_target_modules in ["all", "attention"]: # fine-tune attention layer
         original_attn_tpl = (
             model.stacked_transformer_params_tpl.transformer_layer_params_tpl.tr_atten_tpl.proj_tpl
         )
