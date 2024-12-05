@@ -160,7 +160,7 @@ def finetune(
         dtl = data_loader.ioh_timeseriesdata(
             root_path=data_path,
             data_path='ETTh1.csv',
-            flag='val',
+            flag='train',
             size=(450, 150, 150),
             num_features=num_features,
             batch_size=batch_size,
@@ -174,7 +174,7 @@ def finetune(
         dval = data_loader.ioh_timeseriesdata(
             root_path=data_path,
             data_path='ETTh1.csv',
-            flag='test',
+            flag='val',
             size=(450, 150, 150),
             num_features=num_features,
             batch_size=batch_size,

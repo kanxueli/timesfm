@@ -17,8 +17,8 @@ CUDA_VISIBLE_DEVICES=4 python3 finetune.py \
     --freq="15min" \
     --num-features 1 \
     --dataset-type "IOH" \
-    --data-path="/home/likx/time_series_forecasting/IOH_Datasets_Preprocess/vitaldb" \
-    --num-epochs=3 \
+    --data-path="/home/likx/time_series_forecasting/IOH_Datasets_Preprocess/vitaldb/Instance_Level_Dataset_FineGrained" \
+    --num-epochs=1 \
     --learning-rate=1e-3 \
     --adam-epsilon=1e-7 \
     --adam-clip-threshold=1e2 \

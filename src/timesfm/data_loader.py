@@ -467,13 +467,13 @@ class ioh_timeseriesdata(object):
     # 由于数据集处理方式问题，目前没办法支持多变量时序预测,为了简单，其他变量和单变量的一样。
     for k, v in bs_data.items():
       if k == "mbp":
-        for i in range(len(bs_data)):
+        for i in range(len(v)):
           bts_train.append(v[i][-448:]) # 448是为了能够被Patching的长度整除，下面同理
         bfeats_train = bts_train
         bcf_train = bts_train
         
       elif k == "prediction_mbp":
-        for i in range(len(bs_data)):
+        for i in range(len(v)):
           bts_pred.append(v[i][-128:])
         bfeats_pred = bts_pred
         bcf_pred = bts_pred
