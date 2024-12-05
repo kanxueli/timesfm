@@ -587,19 +587,19 @@ class PatchedTimeSeriesDecoder(nn.Module):
   def __init__(self, config: TimesFMConfig):
     super().__init__()
     self.config = config
-    self.input_ff_layer = ResidualBlock(
+    self.input_ff_layer = ResidualBlock( # input layer
         input_dims=2 * config.patch_len,
         output_dims=config.hidden_size,
         hidden_dims=config.intermediate_size,
     )
-    self.freq_emb = nn.Embedding(num_embeddings=3,
+    self.freq_emb = nn.Embedding(num_embeddings=3, # embedding layer
                                  embedding_dim=config.hidden_size)
-    self.horizon_ff_layer = ResidualBlock(
+    self.horizon_ff_layer = ResidualBlock( # output layer
         input_dims=config.hidden_size,
         output_dims=config.horizon_len * (1 + len(config.quantiles)),
         hidden_dims=config.intermediate_size,
     )
-    self.stacked_transformer = StackedDecoder(
+    self.stacked_transformer = StackedDecoder( # backbone(only decoder)
         hidden_size=self.config.hidden_size,
         intermediate_size=self.config.intermediate_size,
         num_heads=self.config.num_heads,
@@ -716,9 +716,9 @@ class PatchedTimeSeriesDecoder(nn.Module):
         input_ts=input_ts,
         input_padding=input_padding,
     )
-    f_emb = self.freq_emb(freq)  # B x 1 x D
-    model_input += f_emb
-    model_output = self.stacked_transformer(model_input, patched_padding)
+    f_emb = self.freq_emb(freq)  # B x 1 x D (model_dim)
+    model_input += f_emb # input layer=token embedding + position embedding(InputResidualBlock(y ⊙ (1 − m)) + PE)
+    model_output = self.stacked_transformer(model_input, patched_padding) # model output
 
     output_ts = self._postprocess_output(model_output, num_outputs, stats)
     return output_ts

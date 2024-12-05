@@ -180,7 +180,7 @@ def get_batched_data_fn(
     print(label_counts)
 
     def data_fn(): # 批次生成器函数
-        for i in range(1 + (len(data) - 1) // batch_size):
+        for i in range(1 + (len(examples['caseid']) - 1) // batch_size):
             yield {k: v[(i * batch_size) : ((i + 1) * batch_size)] for k, v in examples.items()}
     
     return data_fn
@@ -206,18 +206,31 @@ def test_timesfm(
     ] = False,
     data_path: Annotated[str, typer.Option(help="Path to dataset csv")]='/home/likx/time_series_forecasting/IOH_Datasets_Preprocess/vitaldb/vitaldb_test_data.csv',
 ):
-    # Loading TimesFM in pytorch version
+    # # Loading TimesFM in pytorch version
+    # tfm = timesfm.TimesFm(
+    #     hparams=timesfm.TimesFmHparams(
+    #         backend="gpu",
+    #         per_core_batch_size=32,      
+    #         horizon_len=horizon_len,
+    #     ),
+    #     checkpoint=timesfm.TimesFmCheckpoint(
+    #         version="torch",
+    #         path=checkpoint_path),
+    # )
+    # print("Loading Model Finish.")
+
+    # # Loading TimesFM in pax/jax version
     tfm = timesfm.TimesFm(
-        hparams=timesfm.TimesFmHparams(
-            backend="gpu",
-            per_core_batch_size=32,      
-            horizon_len=horizon_len,
-        ),
-        checkpoint=timesfm.TimesFmCheckpoint(
-            version="torch",
-            path=checkpoint_path),
+      hparams=timesfm.TimesFmHparams(
+        backend="gpu",
+        per_core_batch_size=32,      
+        horizon_len=horizon_len,
+      ),
+      checkpoint=timesfm.TimesFmCheckpoint(
+         version="jax",
+         step=1100000,
+         path="/home/likx/time_series_forecasting/datasets_and_checkpoints/timesfm-1.0-200m/checkpoints/"),
     )
-    print("Loading Model Finish.")
 
     # Benchmark
     if is_instance_setting:

@@ -12,10 +12,12 @@ CUDA_VISIBLE_DEVICES=4 python3 finetune.py \
     --checkpoint-path="/home/likx/time_series_forecasting/datasets_and_checkpoints/timesfm-1.0-200m/checkpoints/" \
     --backend="gpu" \
     --horizon-len=128 \
-    --context-len=512 \
-    --batch-size=128 \
+    --context-len=448 \
+    --batch-size=32 \
     --freq="15min" \
-    --data-path="../datasets/ETT-small/ETTm1.csv" \
+    --num-features 1 \
+    --dataset-type "IOH" \
+    --data-path="/home/likx/time_series_forecasting/IOH_Datasets_Preprocess/vitaldb" \
     --num-epochs=3 \
     --learning-rate=1e-3 \
     --adam-epsilon=1e-7 \

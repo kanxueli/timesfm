@@ -40,7 +40,7 @@ class TimesFmTorch(timesfm_base.TimesFmBase):
         horizon_len=self.output_patch_len,
         head_dim=self.model_dims // self.num_heads,
         quantiles=self.quantiles,
-    )
+    ) # model config
     self._model = None
     self.num_cores = 1
     self.global_batch_size = self.per_core_batch_size

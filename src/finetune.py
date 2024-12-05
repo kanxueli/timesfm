@@ -70,6 +70,8 @@ def finetune(
         str, typer.Option(help="The path to the local model checkpoint.")
     ] = None,
     datetime_col: Annotated[str, typer.Option(help="Column having datetime.")] = "ds",
+    num_features: Annotated[int, typer.Option(help="input features numbers")] = 1,
+    dataset_type:  Annotated[str, typer.Option(help="Wether dataset type IOH or not.")] = "Other",
     ts_cols: Annotated[
         list[str], typer.Option(help="Columns of time-series features.")
     ] = [],
@@ -153,39 +155,69 @@ def finetune(
     key = jax.random.PRNGKey(seed=RANDOM_SEED)
     wandb.init(project=wandb_project, config=locals(), mode="online")
 
-    data_df = pd.read_csv(open(data_path, "r"))
+    if dataset_type == "IOH":
+        ts_cols=["mbp"]
+        dtl = data_loader.ioh_timeseriesdata(
+            root_path=data_path,
+            data_path='ETTh1.csv',
+            flag='val',
+            size=(450, 150, 150),
+            num_features=num_features,
+            batch_size=batch_size,
+            instanceLevel_flag=False,
+            freq='H',
+            normalize=False,
+            permute=True,
+        )
+        train_batches = dtl.tf_dataset().batch(1)
+        # val_batches = dtl.tf_dataset()
+        dval = data_loader.ioh_timeseriesdata(
+            root_path=data_path,
+            data_path='ETTh1.csv',
+            flag='test',
+            size=(450, 150, 150),
+            num_features=num_features,
+            batch_size=batch_size,
+            instanceLevel_flag=False,
+            freq='H',
+            normalize=False,
+            permute=True,
+        )
+        val_batches = dval.tf_dataset()
+    else:
+        data_df = pd.read_csv(open(data_path, "r"))
 
-    if boundaries == (0, 0, 0):
-        # Default boundaries: train 60%, val 20%, test 20%
-        boundaries = [
-            int(len(data_df) * 0.6),
-            int(len(data_df) * 0.8),
-            len(data_df) - 1,
-        ]
+        if boundaries == (0, 0, 0):
+            # Default boundaries: train 60%, val 20%, test 20%
+            boundaries = [
+                int(len(data_df) * 0.6),
+                int(len(data_df) * 0.8),
+                len(data_df) - 1,
+            ]
+        # datetime_col 时间戳列名，ts_cols是指有多少个时间变量(除了时间戳)
+        ts_cols = [col for col in data_df.columns if col != datetime_col]
 
-    ts_cols = [col for col in data_df.columns if col != datetime_col]
+        dtl = data_loader.TimeSeriesdata(
+            data_path=data_path,
+            datetime_col=datetime_col,
+            num_cov_cols=None,
+            cat_cov_cols=None,
+            ts_cols=np.array(ts_cols),
+            train_range=[0, boundaries[0]],
+            val_range=[boundaries[0], boundaries[1]],
+            test_range=[boundaries[1], boundaries[2]],
+            hist_len=context_len,
+            pred_len=horizon_len,
+            batch_size=batch_size,
+            freq=freq,
+            normalize=normalize,
+            epoch_len=None,
+            holiday=False,
+            permute=False,
+        )
 
-    dtl = data_loader.TimeSeriesdata(
-        data_path=data_path,
-        datetime_col=datetime_col,
-        num_cov_cols=None,
-        cat_cov_cols=None,
-        ts_cols=np.array(ts_cols),
-        train_range=[0, boundaries[0]],
-        val_range=[boundaries[0], boundaries[1]],
-        test_range=[boundaries[1], boundaries[2]],
-        hist_len=context_len,
-        pred_len=horizon_len,
-        batch_size=batch_size,
-        freq=freq,
-        normalize=normalize,
-        epoch_len=None,
-        holiday=False,
-        permute=False,
-    )
-
-    train_batches = dtl.tf_dataset(mode="train", shift=1).batch(batch_size)
-    val_batches = dtl.tf_dataset(mode="val", shift=horizon_len)
+        train_batches = dtl.tf_dataset(mode="train", shift=1).batch(batch_size)
+        val_batches = dtl.tf_dataset(mode="val", shift=horizon_len)
 
     for tbatch in tqdm(train_batches.as_numpy_iterator()):
         break
@@ -240,7 +272,7 @@ def finetune(
 
     if use_lora:
         load_adapter_layer(
-            mdl_vars=tfm._train_state.mdl_vars,
+            mdl_vars=tfm._train_state.mdl_vars, # tfm._train_state.mdl_vars is the full model parameters
             model=model.core_layer_tpl,
             lora_rank=lora_rank,
             lora_target_modules=lora_target_modules,
@@ -359,7 +391,7 @@ def finetune(
         train_its = train_batches.as_numpy_iterator()
         train_losses = []
         for batch in tqdm(train_its):
-            tbatch = process_train_batch(batch)
+            tbatch = process_train_batch(batch) # 逐个取出data_loader.tf_dataset返回的数据
             tbatch = reshape_batch_for_pmap(tbatch, num_devices)
             replicated_jax_states, step_fun_out = p_train_step(
                 replicated_jax_states, train_prng_seed, tbatch

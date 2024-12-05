@@ -204,7 +204,7 @@ def _masked_mean_std(inputs: JTensor,
 
 
 def _create_quantiles() -> list[float]:
-  """Returns the quantiles for forecasting."""
+  """Returns the quantiles(分位数) for forecasting."""
   return DEFAULT_QUANTILES
 
 
@@ -241,14 +241,14 @@ class PatchedTimeSeriesDecoder(base_layer.BaseLayer):
   def setup(self) -> None:
     """Construct the model."""
     num_outputs = len(self.quantiles) + 1
-
+    # backbone 
     stl = self.stacked_transformer_params_tpl.clone()
     stl.model_dims = self.model_dims
     stl.hidden_dims = self.hidden_dims
     stl.mask_self_attention = True
 
     self.create_child("stacked_transformer_layer", stl)
-
+    # input layer
     input_resl = self.residual_block_tpl.clone()
     ff_in_dims = 2 * self.patch_len
     input_resl.input_dims = ff_in_dims
@@ -258,7 +258,7 @@ class PatchedTimeSeriesDecoder(base_layer.BaseLayer):
         "input_ff_layer",
         input_resl,
     )
-
+    # output layer
     horizon_resl = self.residual_block_tpl.clone()
     horizon_resl.input_dims = self.model_dims
     horizon_resl.hidden_dims = self.hidden_dims
@@ -267,13 +267,13 @@ class PatchedTimeSeriesDecoder(base_layer.BaseLayer):
         "horizon_ff_layer",
         horizon_resl,
     )
-
+    # position embedding
     self.create_child(
         "position_emb",
         pax_fiddle.Config(layers.PositionalEmbedding,
                           embedding_dims=self.model_dims),
     )
-
+    # frequrcy embedding
     if self.use_freq:
       self.create_child(
           "freq_emb",
