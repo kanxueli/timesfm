@@ -15,6 +15,7 @@ import wandb
 import os
 from typing_extensions import Annotated
 from adapter.utils import load_adapter_checkpoint
+import json
 
 # Define metrics
 def mse(y_pred, y_true):
@@ -186,6 +187,37 @@ def get_batched_data_fn(
     
     return data_fn
 
+def save_predictions(preds, trues, file_path="predictions_and_trues.json"):
+    """
+    Save the predictions and true values to a file for later evaluation.
+    If the file already exists, append the new predictions and true values.
+
+    Parameters:
+    - preds (ndarray): The predicted values from the model.
+    - trues (ndarray): The ground truth values.
+    - file_path (str): The file path where the data will be saved.
+    """
+    # Convert ndarray to list for JSON serialization
+    new_data = {
+        'predictions': preds.tolist(),
+        'ground_truths': trues.tolist()
+    }
+
+    # Check if the file exists
+    try:
+        with open(file_path, 'r') as f:
+            existing_data = json.load(f)
+    except FileNotFoundError:
+        existing_data = {'predictions': [], 'ground_truths': []}
+
+    # Append new data to existing data
+    existing_data['predictions'].extend(new_data['predictions'])
+    existing_data['ground_truths'].extend(new_data['ground_truths'])
+
+    # Write the updated data back to the file
+    with open(file_path, 'w') as f:
+        json.dump(existing_data, f)
+
 def test_timesfm(
     *,
     model_name: Annotated[
@@ -269,6 +301,8 @@ def test_timesfm(
     metrics = defaultdict(list)
 
     ground_true_labels = []
+    preds = []
+    trues = []
     for i, example in enumerate(input_data()):
         if np.array(example["inputs"]).shape != (batch_size, context_len):
             continue
@@ -287,12 +321,22 @@ def test_timesfm(
         raw_forecast = raw_forecast[:, :horizon_len]
         true_series = np.array(example["outputs"])[:, :horizon_len]
         ground_true_labels.extend(example["label"])
+        preds.append(raw_forecast)
+        trues.append(true_series)
 
         metrics["eval_mae_timesfm"].extend(mae(raw_forecast, true_series))
         metrics["eval_mse_timesfm"].extend(mse(raw_forecast[:, :horizon_len], true_series))
         metrics["eval_pred_lable_timesfm"].extend(user_definable_IOH(raw_forecast))
 
     print()
+
+    # saving prediction results
+    pds = np.array(preds)
+    trs = np.array(trues)
+    pds = pds.reshape(-1, pds.shape[-1], 1) # 注意，这里只对单变量预测有效
+    trs = trs.reshape(-1, trs.shape[-1], 1)
+    print("p_shape:{}, t_shape:{}".format(pds.shape, trs.shape))
+    save_predictions(pds, trs)
 
     for k, v in metrics.items():
         if k in ["eval_pred_lable_timesfm", "eval_pred_lable_xreg_timesfm", "eval_pred_lable_xreg"]:

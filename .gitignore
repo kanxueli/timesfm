@@ -7,3 +7,4 @@ datasets/
 results/
 timesfm_jax.egg-info/
 *.log
+predictions_and_trues.json
