@@ -5,6 +5,9 @@ export TF_CPP_MIN_LOG_LEVEL=2 XLA_PYTHON_CLIENT_PREALLOCATE=false
 timesfm_path=/home/likx/time_series_forecasting/datasets_and_checkpoints/timesfm-1.0-200m/checkpoints/
 dataset_path=/home/likx/time_series_forecasting/IOH_Datasets_Preprocess/vitaldb/Instance_Level_Dataset_FineGrained
 adapter_save_checkpoint_dir=./checkpoints/run_finetune
+ 
+rm predictions_and_trues.json
+rm wandb -rf
 
 for caseid in "${caseid_list[@]}"
  do

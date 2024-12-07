@@ -443,7 +443,7 @@ class ioh_timeseriesdata(object):
         
       elif k == "prediction_mbp":
         for i in range(len(v)):
-          bts_pred.append(v[i][-128:])
+          bts_pred.append(v[i][:128])
         bfeats_pred = bts_pred
         bcf_pred = bts_pred
       
