@@ -11,11 +11,13 @@ CUDA_VISIBLE_DEVICES=4 python3 test_finetuned_timesfm.py \
     --data-path="/home/likx/time_series_forecasting/IOH_Datasets_Preprocess/vitaldb/Instance_Level_Dataset_FineGrained" \
     --horizon-len=150 \
     --context-len=450 \
-    --batch-size=128 \
+    --batch-size=2 \
+    --case-id 1\
+    --is-instance-setting \
     --use-lora-adapter \
     --lora-rank=1 \
     --lora-target-modules="all" \
-    --adapter-path="./checkpoints/run_20241205_231449_pg3jjpcg" \
+    --adapter-path="./checkpoints/run_20241207_194030_vhrcakjc" \
 
 # done
 # To see all available options and their descriptions, use the --help flag

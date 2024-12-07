@@ -76,8 +76,14 @@ def finetune(
         list[str], typer.Option(help="Columns of time-series features.")
     ] = [],
     normalize: Annotated[
-        bool, typer.Option(help="Normalize data for eval or not")
+        bool, typer.Option(help="Normalize data for eval or not.")
     ] = True,
+    is_instance_finetune: Annotated[
+        bool, typer.Option(help="finetune instance level for eval or not.")
+    ] = False,
+    case_id: Annotated[
+        int, typer.Option(help="case id stands for file number.")
+    ] = 0,
     context_len: Annotated[int, typer.Option(help="Length of the context window")],
     horizon_len: Annotated[int, typer.Option(help="Prediction length.")],
     freq: Annotated[
@@ -159,12 +165,12 @@ def finetune(
         ts_cols=["mbp"]
         dtl = data_loader.ioh_timeseriesdata(
             root_path=data_path,
-            data_path='ETTh1.csv',
+            data_path=case_id,
             flag='train',
             size=(450, 150, 150),
             num_features=num_features,
             batch_size=batch_size,
-            instanceLevel_flag=False,
+            instanceLevel_flag=is_instance_finetune,
             freq='H',
             normalize=False,
             permute=True,
@@ -173,12 +179,12 @@ def finetune(
         # val_batches = dtl.tf_dataset()
         dval = data_loader.ioh_timeseriesdata(
             root_path=data_path,
-            data_path='ETTh1.csv',
+            data_path=case_id,
             flag='val',
             size=(450, 150, 150),
             num_features=num_features,
             batch_size=batch_size,
-            instanceLevel_flag=False,
+            instanceLevel_flag=is_instance_finetune,
             freq='H',
             normalize=False,
             permute=True,
@@ -241,28 +247,6 @@ def finetune(
          path=checkpoint_path),
     )
     print("Loading Model Finish.")
-    # tfm = TimesFm(
-    #     context_len=context_len,
-    #     horizon_len=horizon_len,
-    #     input_patch_len=INPUT_PATCH_LEN,
-    #     output_patch_len=OUTPUT_PATCH_LEN,
-    #     num_layers=NUM_LAYERS,
-    #     model_dims=MODEL_DIMS,
-    #     backend=backend,
-    #     per_core_batch_size=batch_size,
-    #     quantiles=QUANTILES,
-    # )
-
-    # if checkpoint_path:
-    #     tfm.load_from_checkpoint(
-    #         checkpoint_path=checkpoint_path,
-    #         checkpoint_type=checkpoints.CheckpointType.FLAX,
-    #     )
-    # else:
-    #     tfm.load_from_checkpoint(
-    #         repo_id=model_name,
-    #         checkpoint_type=checkpoints.CheckpointType.FLAX,
-    #     )
 
     model = pax_fiddle.Config( # model configuration in pax/jax version
         patched_decoder.PatchedDecoderFinetuneModel,
@@ -382,7 +366,12 @@ def finetune(
 
     patience = 0
     best_eval_loss = 1e7
-    checkpoint_dir = f"{checkpoint_dir}/run_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{wandb.run.id}"
+    # config adapter checkpoint_path
+    if is_instance_finetune:
+        checkpoint_dir = checkpoint_dir + "/run_finetune"
+    else:
+        checkpoint_dir = f"{checkpoint_dir}/run_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{wandb.run.id}"
+    
     for epoch in range(num_epochs):
         if patience >= early_stop_patience:
             print("Early stopping.")

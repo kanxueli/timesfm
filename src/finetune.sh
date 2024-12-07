@@ -24,6 +24,8 @@ CUDA_VISIBLE_DEVICES=4 python3 finetune.py \
     --adam-clip-threshold=1e2 \
     --early-stop-patience=10 \
     --datetime-col="date" \
+    --is-instance-finetune \
+    --case-id 4 \
     --use-lora \
     --lora-rank=1 \
     --lora-target-modules="all" \

@@ -339,7 +339,7 @@ def test_timesfm(
     save_predictions(pds, trs)
 
     for k, v in metrics.items():
-        if k in ["eval_pred_lable_timesfm", "eval_pred_lable_xreg_timesfm", "eval_pred_lable_xreg"]:
+        if not is_instance_setting and k in ["eval_pred_lable_timesfm", "eval_pred_lable_xreg_timesfm", "eval_pred_lable_xreg"]:
             print(k, "--Prediction Results:")
             precision, recall, thmbps = precision_recall_curve(ground_true_labels, v)
             auprc = auc(recall, precision)
