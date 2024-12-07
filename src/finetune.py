@@ -154,12 +154,15 @@ def finetune(
     checkpoint_dir: Annotated[
         str, typer.Option(help="Checkpoint directory")
     ] = "./checkpoints",
+    wandb_mode: Annotated[
+        str, typer.Option(help="wandb mode")
+    ] = "online",
     wandb_project: Annotated[
         str, typer.Option(help="Weights & Biases project name")
     ] = "google_timesfm_finetune",
 ) -> None:
     key = jax.random.PRNGKey(seed=RANDOM_SEED)
-    wandb.init(project=wandb_project, config=locals(), mode="online")
+    wandb.init(project=wandb_project, config=locals(), mode=wandb_mode)
 
     if dataset_type == "IOH":
         ts_cols=["mbp"]
@@ -368,7 +371,7 @@ def finetune(
     best_eval_loss = 1e7
     # config adapter checkpoint_path
     if is_instance_finetune:
-        checkpoint_dir = checkpoint_dir + "/run_finetune"
+        checkpoint_dir = checkpoint_dir
     else:
         checkpoint_dir = f"{checkpoint_dir}/run_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{wandb.run.id}"
     

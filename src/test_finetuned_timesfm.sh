@@ -12,12 +12,12 @@ CUDA_VISIBLE_DEVICES=4 python3 test_finetuned_timesfm.py \
     --horizon-len=150 \
     --context-len=450 \
     --batch-size=2 \
-    --case-id 1\
+    --case-id 1 \
     --is-instance-setting \
     --use-lora-adapter \
     --lora-rank=1 \
     --lora-target-modules="all" \
-    --adapter-path="./checkpoints/run_20241207_194030_vhrcakjc" \
+    --adapter-path="./checkpoints/run_finetune" \
 
 # done
 # To see all available options and their descriptions, use the --help flag
