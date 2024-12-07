@@ -276,7 +276,7 @@ def finetune(
             model=model.core_layer_tpl,
             lora_rank=lora_rank,
             lora_target_modules=lora_target_modules,
-            use_dora=use_dora, # weather lora + dora finetune
+            use_dora=use_dora, # whether lora + dora finetune
         )
 
     # config trainable parameter

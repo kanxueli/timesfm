@@ -6,12 +6,15 @@ from collections import defaultdict
 from sklearn.metrics import auc, classification_report, confusion_matrix, accuracy_score, roc_curve, roc_auc_score, f1_score, precision_recall_curve
 
 import timesfm
-import torch
 import pandas as pd
 import numpy as np
 from collections import defaultdict
 import time
-from peft import get_peft_model, LoraConfig, TaskType
+import typer
+import wandb
+import os
+from typing_extensions import Annotated
+from adapter.utils import load_adapter_checkpoint
 
 # Define metrics
 def mse(y_pred, y_true):
@@ -94,13 +97,28 @@ def user_definable_IOH(time_series):
 
 def get_batched_data_fn(
     batch_size: int = 128, 
-    data_path: str=None, 
-    # context_len: int = 120, 
-    # horizon_len: int = 24,
+    data_path: str = None,
+    context_len: int = 120, 
+    horizon_len: int = 24,
+    is_instance: bool = False,
+    data_flag: str = "test",
+    case_id: int = 0,
 ):
     # 读取CSV文件
-    csv_file = data_path
-    data = pd.read_csv(csv_file)
+    if is_instance :
+        if data_flag == 'train':
+            data = pd.read_csv(os.path.join(data_path, str(case_id) + '_train.csv'))
+        elif data_flag == 'val':
+            data = pd.read_csv(os.path.join(data_path, str(case_id)  + '_val.csv'))
+        elif data_flag == 'test':
+            data = pd.read_csv(os.path.join(data_path, str(case_id)  + '_test.csv'))
+    else:
+        if data_flag == 'train':
+            data = pd.read_csv(os.path.join(data_path, 'vitaldb_train_data.csv'))
+        elif data_flag == 'val':
+            data = pd.read_csv(os.path.join(data_path, 'vitaldb_val_data.csv'))
+        elif data_flag == 'test':
+            data = pd.read_csv(os.path.join(data_path, 'vitaldb_test_data.csv'))
 
     # 数据预处理前总数据
     print("源数据长度：", len(data))
@@ -136,8 +154,8 @@ def get_batched_data_fn(
         mbp = parse_sequence(row['mbp'][1:-1], skip_rate=0, sample_type='skip_sample')
         prediction_mbp = parse_sequence(row['prediction_mbp'][1:-1], skip_rate=0, sample_type='skip_sample')
         # print(len(bts), len(hrs), len(dbp), len(mbp), len(prediction_mbp))
-        if len(bts) != 450 or len(hrs) != 450 or len(dbp) != 450 or\
-            len(mbp) != 450 or len(prediction_mbp) != 150:
+        if len(bts) != context_len or len(hrs) != context_len or len(dbp) != context_len or\
+            len(mbp) != context_len or len(prediction_mbp) != horizon_len:
             continue
         
         examples['caseid'].append(row['caseid'])
@@ -163,75 +181,109 @@ def get_batched_data_fn(
     print(label_counts)
 
     def data_fn(): # 批次生成器函数
-        for i in range(1 + (len(data) - 1) // batch_size):
+        for i in range(1 + (len(examples['caseid']) - 1) // batch_size):
             yield {k: v[(i * batch_size) : ((i + 1) * batch_size)] for k, v in examples.items()}
     
     return data_fn
 
-# 数据集加载与批量化
-context_len = 450
-horizon_len = 150
-bs = 128
-train_data = get_batched_data_fn(batch_size=bs, data_path='/home/likx/time_series_forecasting/IOH_Datasets_Preprocess/vitaldb/vitaldb_train_data.csv')
+def test_timesfm(
+    *,
+    model_name: Annotated[
+        str, typer.Option(help="Specify the name of the huggingface model.")
+    ] = "google/timesfm-1.0-200m",
+    checkpoint_path: Annotated[
+        str, typer.Option(help="The path to the local model checkpoint.")
+    ] = "/home/data/times-forecasting/checkpoints/timesfm-1.0-200m-pytorch/torch_model.ckpt",
+    adapter_path: Annotated[
+        str, typer.Option(help="The path to the local model checkpoint.")
+    ] = "",
+    context_len: Annotated[int, typer.Option(help="Length of the context window")],
+    horizon_len: Annotated[int, typer.Option(help="Prediction length.")],
+    batch_size: Annotated[
+        int, typer.Option(help="Batch size for the randomly sampled batch")
+    ] = 128,
+    lora_rank: Annotated[int, typer.Option(help="LoRA Rank",),] = 8,
+    lora_target_modules: Annotated[
+        str,
+        typer.Option(
+            help="LoRA target modules of the transformer block. Allowed values: [all, attention, mlp]"
+        ),
+    ] = "all",
+    case_id: Annotated[
+        int, typer.Option(help="Batch size for the randomly sampled batch")
+    ] = 0,
+    is_instance_setting: Annotated[
+        bool, typer.Option(help="Normalize data for eval or not")
+    ] = False,
+    use_lora_adapter: Annotated[
+        bool, typer.Option(help="Normalize data for eval or not")
+    ] = False,
+    data_path: Annotated[str, typer.Option(help="Path to dataset csv")]='/home/likx/time_series_forecasting/IOH_Datasets_Preprocess/vitaldb/vitaldb_test_data.csv',
+):
+    # # Loading TimesFM in pytorch version
+    # tfm = timesfm.TimesFm(
+    #     hparams=timesfm.TimesFmHparams(
+    #         backend="gpu",
+    #         per_core_batch_size=32,      
+    #         horizon_len=horizon_len,
+    #     ),
+    #     checkpoint=timesfm.TimesFmCheckpoint(
+    #         version="torch",
+    #         path=checkpoint_path),
+    # )
+    # print("Loading Model Finish.")
 
-# Loading TimesFM in pytorch version
-tfm = timesfm.TimesFm(
+    # Loading TimesFM in pax/jax version
+    tfm = timesfm.TimesFm(
       hparams=timesfm.TimesFmHparams(
-          backend="gpu",
-          per_core_batch_size=32,      
-          horizon_len=horizon_len,
+        backend="gpu",
+        per_core_batch_size=32,      
+        horizon_len=horizon_len,
       ),
       checkpoint=timesfm.TimesFmCheckpoint(
-          version="torch",
-          path="/home/data/times-forecasting/checkpoints/timesfm-1.0-200m-pytorch/torch_model.ckpt"),
-  )
-print("Loading Model Finish.")
+         version="jax",
+         step=1100000,
+         path=checkpoint_path),
+    )
+    
+    # Loading adapter for TimesFM if need
+    if use_lora_adapter:
+        load_adapter_checkpoint(
+            model=tfm,
+            adapter_checkpoint_path=adapter_path,
+            lora_rank=lora_rank,
+            lora_target_modules=lora_target_modules,
+            use_dora=False,
+            )
 
+    # Benchmark
+    if is_instance_setting:
+        input_data = get_batched_data_fn(
+            batch_size=batch_size, data_path=data_path, context_len=context_len, 
+            horizon_len=horizon_len, is_instance=True, data_flag="test", case_id=case_id)
+    else:
+        input_data = get_batched_data_fn(
+            batch_size=batch_size, data_path=data_path, context_len=context_len, 
+            horizon_len=horizon_len, is_instance=False, data_flag="test")
+    
+    metrics = defaultdict(list)
 
-# 使用LoRA进行微调
-lora_config = LoraConfig(
-    r=8,  
-    lora_alpha=16,
-    lora_dropout=0.1,  
-    bias="none",
-    target_modules=["query", "key", "value"],
-)
-
-lora_model = get_peft_model(tfm, lora_config)
-
-# 冻结原始模型权重，只微调LoRA模块
-for param in tfm.parameters():
-    param.requires_grad = False
-for param in lora_model.parameters():
-    param.requires_grad = True
-
-# 定义优化器
-optimizer = torch.optim.AdamW(lora_model.parameters(), lr=1e-5)
-
-# 微调循环
-metrics = defaultdict(list)
-ground_true_labels = []
-for epoch in range(5):  # 微调5个epoch
-    for i, example in enumerate(train_data()):
-        if np.array(example["inputs"]).shape != (bs, context_len):
+    ground_true_labels = []
+    for i, example in enumerate(input_data()):
+        if np.array(example["inputs"]).shape != (batch_size, context_len):
             continue
 
-        optimizer.zero_grad()
+        start_time = time.time()
+        raw_forecast, _ = tfm.forecast(
+            inputs=example["inputs"], freq=[0] * len(example["inputs"])
+        )
         
-        # 将数据送入模型进行预测
-        inputs = torch.tensor(example["inputs"]).float()
-        outputs = torch.tensor(example["outputs"]).float()
-        
-        raw_forecast, _ = lora_model.forecast(inputs=inputs, freq=[0] * len(inputs))
-        
-        # 计算MSE损失
-        loss = mse(raw_forecast, outputs)
-        loss.backward()
-        
-        # 更新LoRA模块的参数
-        optimizer.step()
-        
-        # 更新评估指标
+        print(
+            f"\rFinished batch {i} linear in {time.time() - start_time} seconds",
+            end="",
+        )
+
+        # print()
         raw_forecast = raw_forecast[:, :horizon_len]
         true_series = np.array(example["outputs"])[:, :horizon_len]
         ground_true_labels.extend(example["label"])
@@ -239,21 +291,25 @@ for epoch in range(5):  # 微调5个epoch
         metrics["eval_mae_timesfm"].extend(mae(raw_forecast, true_series))
         metrics["eval_mse_timesfm"].extend(mse(raw_forecast[:, :horizon_len], true_series))
         metrics["eval_pred_lable_timesfm"].extend(user_definable_IOH(raw_forecast))
-        
-        print(f"Finished batch {i} in epoch {epoch + 1}.")
 
-# 保存微调后的模型
-lora_model.save_pretrained("/path_to_save_lora_model")
+    print()
 
-# 输出最终评估结果
-for k, v in metrics.items():
-    if k in ["eval_pred_lable_timesfm"]:
-        precision, recall, _ = precision_recall_curve(ground_true_labels, v)
-        auprc = auc(recall, precision)
-        fpr, tpr, _ = roc_curve(ground_true_labels, v)
-        auroc = auc(fpr, tpr)
-        f1 = f1_score(ground_true_labels, v)
-        acc = accuracy_score(ground_true_labels, v)
-        print(f"auroc={auroc:.3f}, auprc={auprc:.3f}, acc={acc:.3f}, F1={f1:.3f}")
-    else:
-        print(f"{k}: {np.mean(v)}")
+    for k, v in metrics.items():
+        if k in ["eval_pred_lable_timesfm", "eval_pred_lable_xreg_timesfm", "eval_pred_lable_xreg"]:
+            print(k, "--Prediction Results:")
+            precision, recall, thmbps = precision_recall_curve(ground_true_labels, v)
+            auprc = auc(recall, precision)
+
+            fpr, tpr, thmbps = roc_curve(ground_true_labels, v)
+            auroc = auc(fpr, tpr)
+            f1 = f1_score(ground_true_labels, v)
+            acc = accuracy_score(ground_true_labels, v)
+            tn, fp, fn, tp = confusion_matrix(ground_true_labels, v).ravel()
+
+            testres = 'auroc={:.3f}, auprc={:.3f} acc={:.3f}, F1={:.3f}, PPV={:.1f}, NPV={:.1f}, TN={}, fp={}, fn={}, TP={}'.format(auroc, auprc, acc, f1, tp/(tp+fp)*100, tn/(tn+fn)*100, tn, fp, fn, tp)
+            print(testres)
+        else:   
+            print(f"{k}: {np.mean(v)}")
+
+if __name__ == "__main__":
+    typer.run(test_timesfm)
