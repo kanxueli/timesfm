@@ -9,6 +9,9 @@ adapter_save_checkpoint_dir=./checkpoints/run_finetune
 rm predictions_and_trues.json
 rm wandb -rf
 
+lora_rank=2
+lora_target_modules="all"
+
 for caseid in "${caseid_list[@]}"
  do
  echo "Training caseid: $caseid"
@@ -36,8 +39,8 @@ for caseid in "${caseid_list[@]}"
     --is-instance-finetune \
     --case-id $caseid \
     --use-lora \
-    --lora-rank=1 \
-    --lora-target-modules="all" \
+    --lora-rank=$lora_rank \
+    --lora-target-modules=$lora_target_modules \
     --cos-initial-decay-value=1e-4 \
     --cos-decay-steps=40000 \
     --cos-final-decay-value=1e-5 \
@@ -54,8 +57,8 @@ for caseid in "${caseid_list[@]}"
     --case-id $caseid \
     --is-instance-setting \
     --use-lora-adapter \
-    --lora-rank=1 \
-    --lora-target-modules="all" \
+    --lora-rank=$lora_rank \
+    --lora-target-modules=$lora_target_modules \
     --adapter-path=$adapter_save_checkpoint_dir \
 
 done
