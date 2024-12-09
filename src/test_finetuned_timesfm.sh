@@ -14,6 +14,7 @@ CUDA_VISIBLE_DEVICES=4 python3 test_finetuned_timesfm.py \
     --batch-size=2 \
     --case-id 1 \
     --is-instance-setting \
+    --use-dora \
     --use-lora-adapter \
     --lora-rank=1 \
     --lora-target-modules="all" \

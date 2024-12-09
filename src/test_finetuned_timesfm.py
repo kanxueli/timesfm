@@ -247,7 +247,10 @@ def test_timesfm(
     is_instance_setting: Annotated[
         bool, typer.Option(help="Normalize data for eval or not")
     ] = False,
-    use_lora_adapter: Annotated[
+    use_dora: Annotated[
+        bool, typer.Option(help="Normalize data for eval or not")
+    ] = False,
+    use_lora: Annotated[
         bool, typer.Option(help="Normalize data for eval or not")
     ] = False,
     data_path: Annotated[str, typer.Option(help="Path to dataset csv")]='/home/likx/time_series_forecasting/IOH_Datasets_Preprocess/vitaldb/vitaldb_test_data.csv',
@@ -279,13 +282,13 @@ def test_timesfm(
     )
     
     # Loading adapter for TimesFM if need
-    if use_lora_adapter:
+    if use_lora:
         load_adapter_checkpoint(
             model=tfm,
             adapter_checkpoint_path=adapter_path,
             lora_rank=lora_rank,
             lora_target_modules=lora_target_modules,
-            use_dora=False,
+            use_dora=use_dora,
             )
 
     # Benchmark
