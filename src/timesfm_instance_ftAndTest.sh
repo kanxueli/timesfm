@@ -42,7 +42,7 @@ for caseid in "${caseid_list[@]}"
     --use-lora \
     --lora-rank=$lora_rank \
     --lora-target-modules=$lora_target_modules \
-    --cos-initial-decay-value=1e-5 \
+    --cos-initial-decay-value=1e-4 \
     --cos-decay-steps=40000 \
     --cos-final-decay-value=1e-5 \
     --ema-decay=0.9999 \
