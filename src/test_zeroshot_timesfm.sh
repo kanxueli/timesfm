@@ -5,9 +5,7 @@ caseid_list=(304 5597 3558 501 4367 1942 5634 1793 206 5242)
 export TF_CPP_MIN_LOG_LEVEL=2 XLA_PYTHON_CLIENT_PREALLOCATE=false
 timesfm_path=/home/likx/time_series_forecasting/datasets_and_checkpoints/timesfm-1.0-200m/checkpoints/
 dataset_path=/home/likx/time_series_forecasting/IOH_Datasets_Preprocess/vitaldb/Instance_Level_Dataset_FineGrained
-adapter_save_checkpoint_dir=./checkpoints/run_finetune
  
-
 
 for caseid in "${caseid_list[@]}"
  do
@@ -22,10 +20,3 @@ for caseid in "${caseid_list[@]}"
     --is-instance-setting \
 
 done
-
-# --use-lora \
-# --use-dora \
-# --use-linear-probing \
-
-# To see all available options and their descriptions, use the --help flag
-# python3 finetune.py --help

@@ -133,7 +133,7 @@ class TimeSeriesdata(object):
 
   def _normalize_data(self):
     self.scaler = StandardScaler()
-    train_mat = self.data_mat[:, 0:self.train_range[1]]
+    train_mat = self.data_mat[:, 0:self.train_range[1]] # only count data in train set
     self.scaler = self.scaler.fit(train_mat.transpose())
     self.data_mat = self.scaler.transform(self.data_mat.transpose()).transpose()
 
@@ -141,7 +141,7 @@ class TimeSeriesdata(object):
   def train_gen(self):
     """Generator for training data."""
     num_ts = len(self.ts_cols)
-    perm = np.arange(
+    perm = np.arange( # initialize range of train set
         self.train_range[0] + self.hist_len,
         self.train_range[1] - self.pred_len,
     )
@@ -220,7 +220,7 @@ class TimeSeriesdata(object):
             tsidx,
         ]
         yield tuple(all_data)
-
+  # get only one sample
   def _get_features_and_ts(self, dtimes, tsidx, hist_len=None):
     """Get features and ts in specified windows."""
     if hist_len is None:
@@ -274,7 +274,8 @@ class ioh_timeseriesdata(object):
       batch_size=1,
       instanceLevel_flag=False,
       freq='H',
-      normalize=False,
+      percent=1.0,
+      normalize=True,
       permute=True,
   ):
     # size [seq_len, label_len, pred_len]
@@ -287,20 +288,22 @@ class ioh_timeseriesdata(object):
     self.label_len = size[1]
     self.pred_len = size[2]
     self.features = num_features
+    self.normalize = normalize
     self.instanceLevel_flag = instanceLevel_flag
 
 
     self.freq = freq
+    self.percent = percent
     self.batch_size=batch_size
     self.permute = permute
     
     # Initialize scalers for each feature to be standardized
-    if normalize:
-      self.scaler_bts = StandardScaler()
-      self.scaler_hrs = StandardScaler()
-      self.scaler_dbp = StandardScaler()
-      self.scaler_mbp = StandardScaler()
-      self.scaler_prediction_mbp = StandardScaler()
+    # if normalize:
+    #   self.scaler_bts = StandardScaler()
+    #   self.scaler_hrs = StandardScaler()
+    #   self.scaler_dbp = StandardScaler()
+    #   self.scaler_mbp = StandardScaler()
+    #   self.scaler_prediction_mbp = StandardScaler()
 
     self.__read_data__()
 
@@ -312,6 +315,7 @@ class ioh_timeseriesdata(object):
               df_raw = pd.read_csv(os.path.join(self.root_path, str(self.data_path) + '_val.csv'))
           elif self.flag == 'test':
               df_raw = pd.read_csv(os.path.join(self.root_path, str(self.data_path) + '_test.csv'))
+          df_raw = df_raw.sample(frac=1, random_state=42).reset_index(drop=True)
       else:
           if self.flag == 'train':
               df_raw = pd.read_csv(os.path.join(self.root_path, 'vitaldb_train_data.csv'))
@@ -319,6 +323,13 @@ class ioh_timeseriesdata(object):
               df_raw = pd.read_csv(os.path.join(self.root_path, 'vitaldb_val_data.csv'))
           elif self.flag == 'test':
               df_raw = pd.read_csv(os.path.join(self.root_path, 'vitaldb_test_data.csv'))
+
+          # random select train/val data
+          if self.flag in ["train", "val"] and self.percent < 1.0:
+            total_size = len(df_raw)
+            shuffled_indices = np.random.permutation(total_size)
+            selected_indices = shuffled_indices[:int(total_size * self.percent)]
+            df_raw = df_raw.iloc[selected_indices].reset_index(drop=True)
 
       '''
       df_raw.columns: ['date', ...(other features), target feature]
@@ -369,7 +380,6 @@ class ioh_timeseriesdata(object):
               return [] 
           
       # 初始化 defaultdict
-      self.scaler = StandardScaler()
       examples = defaultdict(list)
 
       for index, row in data.iterrows():
@@ -425,6 +435,15 @@ class ioh_timeseriesdata(object):
       #     examples['prediction_mbp'] = self.scaler_prediction_mbp.transform(examples['prediction_mbp'])
 
       self.data = examples
+      if self.normalize and self.flag == "train":
+        self._normalize_data()
+  
+  def _normalize_data(self): # This version only considers univariates
+    self.scaler = StandardScaler()
+    self.scaler = self.scaler.fit(self.data['mbp']) # only count data in train set
+    self.data['mbp'] = self.scaler.transform(self.data['mbp'])
+    self.scaler = self.scaler.fit(self.data['prediction_mbp']) # only count data in train set
+    self.data['prediction_mbp'] = self.scaler.transform(self.data['prediction_mbp'])
 
   def _get_features_and_ts(self, bs_data):
     bts_train=[] 
@@ -438,14 +457,14 @@ class ioh_timeseriesdata(object):
       if k == "mbp":
         for i in range(len(v)):
           bts_train.append(v[i][-448:])
-        bfeats_train = bts_train
-        bcf_train = bts_train
+        # bfeats_train = bts_train
+        # bcf_train = bts_train
         
       elif k == "prediction_mbp":
         for i in range(len(v)):
           bts_pred.append(v[i][:128])
-        bfeats_pred = bts_pred
-        bcf_pred = bts_pred
+        # bfeats_pred = bts_pred
+        # bcf_pred = bts_pred
       
     return bts_train, bts_pred, bfeats_train, bfeats_pred, bcf_train, bcf_pred
      

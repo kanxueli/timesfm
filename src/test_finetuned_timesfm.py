@@ -277,7 +277,6 @@ def test_timesfm(
       ),
       checkpoint=timesfm.TimesFmCheckpoint(
          version="jax",
-         step=1100000,
          path=checkpoint_path),
     )
     

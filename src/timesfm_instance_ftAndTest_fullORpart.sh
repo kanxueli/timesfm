@@ -7,13 +7,45 @@ timesfm_path=/home/likx/time_series_forecasting/datasets_and_checkpoints/timesfm
 dataset_path=/home/likx/time_series_forecasting/IOH_Datasets_Preprocess/vitaldb/Instance_Level_Dataset_FineGrained
 adapter_save_checkpoint_dir=./checkpoints/run_finetune
  
-
+rm predictions_and_trues.json
+rm wandb -rf
 
 for caseid in "${caseid_list[@]}"
  do
+ echo "Training caseid: $caseid"
+ # clear adapter checkpoint dir
+ rm $adapter_save_checkpoint_dir -rf
+
+ # Note: current version don't support multi-GPU finetune
+ CUDA_VISIBLE_DEVICES=4 python3 finetune.py \
+    --checkpoint-path=$timesfm_path \
+    --data-path=$dataset_path \
+    --backend="gpu" \
+    --horizon-len=128 \
+    --context-len=448 \
+    --freq="S" \
+    --batch-size=32 \
+    --num-features 1 \
+    --dataset-type "IOH" \
+    --checkpoint-dir=$adapter_save_checkpoint_dir \
+    --num-epochs=15 \
+    --learning-rate=5e-1 \
+    --adam-epsilon=1e-2 \
+    --adam-clip-threshold=1e2 \
+    --early-stop-patience=10 \
+    --datetime-col="date" \
+    --is-instance-finetune \
+    --case-id $caseid \
+    --use-linear-probing \
+    --cos-initial-decay-value=1e-4 \
+    --cos-decay-steps=40000 \
+    --cos-final-decay-value=1e-5 \
+    --ema-decay=0.9999 \
+    --wandb-mode="offline" \
+
  echo "Testing caseid: $caseid"
  CUDA_VISIBLE_DEVICES=4 python3 test_finetuned_timesfm.py \
-    --checkpoint-path=$timesfm_path \
+    --checkpoint-path=$adapter_save_checkpoint_dir \
     --data-path=$dataset_path \
     --horizon-len=150 \
     --context-len=450 \
@@ -22,10 +54,6 @@ for caseid in "${caseid_list[@]}"
     --is-instance-setting \
 
 done
-
-# --use-lora \
-# --use-dora \
-# --use-linear-probing \
 
 # To see all available options and their descriptions, use the --help flag
 # python3 finetune.py --help

@@ -487,6 +487,8 @@ class PatchedDecoderFinetuneModel(base_model.BaseModel):
   freq: int = 0
 
   def setup(self) -> None:
+    # 用于创建一个子模块或子对象,并且这些子模块可以像父模块一样被训练和优化。
+    # 创建名为core_layer的子模块，然后是self.core_layer_tpl的网络结构
     self.create_child("core_layer", self.core_layer_tpl)
 
   def compute_predictions(self, input_batch: NestedMap) -> NestedMap:
@@ -530,7 +532,7 @@ class PatchedDecoderFinetuneModel(base_model.BaseModel):
     output_ts = prediction_output[_OUTPUT_TS]
     actual_ts = input_batch[_TARGET_FUTURE]
     pred_ts = output_ts[:, -1, 0:actual_ts.shape[1], :]
-    loss = jnp.square(pred_ts[:, :, 0] - actual_ts)
+    loss = jnp.square(pred_ts[:, :, 0] - actual_ts) # MSE Loss
     for i, quantile in enumerate(self.core_layer.quantiles):
       loss += self._quantile_loss(pred_ts[:, :, i + 1], actual_ts, quantile)
     loss = loss.mean()

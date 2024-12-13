@@ -104,6 +104,9 @@ def finetune(
     batch_size: Annotated[
         int, typer.Option(help="Batch size for the randomly sampled batch")
     ] = 16,
+    data_percent: Annotated[
+        float, typer.Option(help="cosine initial decay value")
+    ]=1.0,
     num_epochs: Annotated[int, typer.Option(help="Number of epochs")],
     learning_rate: Annotated[float, typer.Option(help="adam optimizer learning rate")],
     adam_epsilon: Annotated[float, typer.Option(help="adam optimizer epsilon")],
@@ -174,12 +177,12 @@ def finetune(
             num_features=num_features,
             batch_size=batch_size,
             instanceLevel_flag=is_instance_finetune,
-            freq='H',
+            freq='S',
+            percent=data_percent,
             normalize=False,
             permute=True,
         )
         train_batches = dtl.tf_dataset().batch(1)
-        # val_batches = dtl.tf_dataset()
         dval = data_loader.ioh_timeseriesdata(
             root_path=data_path,
             data_path=case_id,
@@ -188,7 +191,8 @@ def finetune(
             num_features=num_features,
             batch_size=batch_size,
             instanceLevel_flag=is_instance_finetune,
-            freq='H',
+            freq='S',
+            percent=data_percent,
             normalize=False,
             permute=True,
         )
@@ -250,11 +254,13 @@ def finetune(
          path=checkpoint_path),
     )
     print("Loading Model Finish.")
-
+    
+    # 使用 pax_fiddle.Config 定义了一个 patched_decoder 模型（微调的模型）。
+    # 其中，core_layer_tpl 是基础的TimesFM模型。
     model = pax_fiddle.Config( # model configuration in pax/jax version
         patched_decoder.PatchedDecoderFinetuneModel,
         name="patched_decoder_finetune",
-        core_layer_tpl=tfm.model_p,
+        core_layer_tpl=tfm.model_p, # Is model_p all pretrained parameters of timesfm? 
     )
 
     if use_lora:
@@ -266,17 +272,22 @@ def finetune(
             use_dora=use_dora, # whether lora + dora finetune
         )
 
-    # config trainable parameter
+    # build_learner 定义了微调模型的优化器、学习率调度策略（如余弦衰减）和哪些参数被冻结或需要微调
+    # （通过 bprop_variable_inclusion 和 bprop_variable_exclusion 来控制）。
     @pax_fiddle.auto_config
     def build_learner() -> learners.Learner:
-        bprop_variable_inclusion = []
-        bprop_variable_exclusion = []
+        bprop_variable_inclusion = [] # fine-tune parameters 
+        bprop_variable_exclusion = [] # frozen parameters 
         if use_lora:
             bprop_variable_inclusion.append(r"^.*lora.*$")
             if use_dora:
                 bprop_variable_inclusion.append(r"^.*dora.*$")
         elif use_linear_probing:
+            # Fine-tunes only the residual blocks and the embedding layer, leaving other parameters frozen
             bprop_variable_exclusion = [".*/stacked_transformer_layer/.*"]
+            # bprop_variable_exclusion = [".*/stacked_transformer_layer/.*", ".*/input_ff_layer/.*", ".*/position_emb/.*",".*/freq_emb/.*"]
+            # bprop_variable_inclusion = [".*/horizon_ff_layer/.*"]
+            
 
         return pax_fiddle.Config(
             learners.Learner,
@@ -294,8 +305,8 @@ def finetune(
                 ),
                 ema_decay=ema_decay,
             ),
-            bprop_variable_exclusion=bprop_variable_exclusion,
-            bprop_variable_inclusion=bprop_variable_inclusion,
+            bprop_variable_exclusion=bprop_variable_exclusion, 
+            bprop_variable_inclusion=bprop_variable_inclusion, 
         )
 
     task_p = tasks_lib.SingleTask(
@@ -369,11 +380,8 @@ def finetune(
 
     patience = 0
     best_eval_loss = 1e7
-    # config adapter checkpoint_path
-    if is_instance_finetune:
-        checkpoint_dir = checkpoint_dir
-    else:
-        checkpoint_dir = f"{checkpoint_dir}/run_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{wandb.run.id}"
+    checkpoint_dir = checkpoint_dir
+    # checkpoint_dir = f"{checkpoint_dir}/run_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{wandb.run.id}"
     
     for epoch in range(num_epochs):
         if patience >= early_stop_patience:

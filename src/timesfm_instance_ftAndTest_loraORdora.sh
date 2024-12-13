@@ -26,7 +26,7 @@ for caseid in "${caseid_list[@]}"
     --backend="gpu" \
     --horizon-len=128 \
     --context-len=448 \
-    --freq="2s" \
+    --freq="S" \
     --batch-size=32 \
     --num-features 1 \
     --dataset-type "IOH" \
