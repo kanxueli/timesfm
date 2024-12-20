@@ -104,6 +104,7 @@ def get_batched_data_fn(
     is_instance: bool = False,
     data_flag: str = "test",
     case_id: int = 0,
+    sr=0,
 ):
     # 读取CSV文件
     if is_instance :
@@ -149,11 +150,11 @@ def get_batched_data_fn(
     examples = defaultdict(list)
 
     for index, row in data.iterrows():
-        bts = parse_sequence(row['bts'][1:-1], skip_rate=0, sample_type='skip_sample') #采样周期是：2*skip_rate
-        hrs = parse_sequence(row['hrs'][1:-1], skip_rate=0, sample_type='skip_sample')
-        dbp = parse_sequence(row['dbp'][1:-1], skip_rate=0, sample_type='skip_sample')
-        mbp = parse_sequence(row['mbp'][1:-1], skip_rate=0, sample_type='skip_sample')
-        prediction_mbp = parse_sequence(row['prediction_mbp'][1:-1], skip_rate=0, sample_type='skip_sample')
+        bts = parse_sequence(row['bts'][1:-1], skip_rate=sr, sample_type='avg_sample') #采样周期是：2*skip_rate
+        hrs = parse_sequence(row['hrs'][1:-1], skip_rate=sr, sample_type='avg_sample')
+        dbp = parse_sequence(row['dbp'][1:-1], skip_rate=sr, sample_type='avg_sample')
+        mbp = parse_sequence(row['mbp'][1:-1], skip_rate=sr, sample_type='avg_sample')
+        prediction_mbp = parse_sequence(row['prediction_mbp'][1:-1], skip_rate=sr, sample_type='avg_sample')
         # print(len(bts), len(hrs), len(dbp), len(mbp), len(prediction_mbp))
         if len(bts) != context_len or len(hrs) != context_len or len(dbp) != context_len or\
             len(mbp) != context_len or len(prediction_mbp) != horizon_len:
@@ -229,6 +230,9 @@ def test_timesfm(
     adapter_path: Annotated[
         str, typer.Option(help="The path to the local model checkpoint.")
     ] = "",
+    results_path: Annotated[
+        str, typer.Option(help="The path to the saving results.")
+    ] = "predictions_and_trues.json",
     context_len: Annotated[int, typer.Option(help="Length of the context window")],
     horizon_len: Annotated[int, typer.Option(help="Prediction length.")],
     batch_size: Annotated[
@@ -338,7 +342,7 @@ def test_timesfm(
     pds = pds.reshape(-1, pds.shape[-1], 1) # 注意，这里只对单变量预测有效
     trs = trs.reshape(-1, trs.shape[-1], 1)
     print("p_shape:{}, t_shape:{}".format(pds.shape, trs.shape))
-    save_predictions(pds, trs)
+    save_predictions(pds, trs, file_path=results_path)
 
     for k, v in metrics.items():
         if not is_instance_setting and k in ["eval_pred_lable_timesfm", "eval_pred_lable_xreg_timesfm", "eval_pred_lable_xreg"]:

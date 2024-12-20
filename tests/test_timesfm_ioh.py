@@ -102,6 +102,7 @@ def get_batched_data_fn(
     is_instance: bool = False,
     data_flag: str = "test",
     case_id: int = 0,
+    sr=0, # skip_rate
 ):
     # 读取CSV文件
     if is_instance :
@@ -147,11 +148,11 @@ def get_batched_data_fn(
     examples = defaultdict(list)
 
     for index, row in data.iterrows():
-        bts = parse_sequence(row['bts'][1:-1], skip_rate=0, sample_type='skip_sample') #采样周期是：2*skip_rate
-        hrs = parse_sequence(row['hrs'][1:-1], skip_rate=0, sample_type='skip_sample')
-        dbp = parse_sequence(row['dbp'][1:-1], skip_rate=0, sample_type='skip_sample')
-        mbp = parse_sequence(row['mbp'][1:-1], skip_rate=0, sample_type='skip_sample')
-        prediction_mbp = parse_sequence(row['prediction_mbp'][1:-1], skip_rate=0, sample_type='skip_sample')
+        bts = parse_sequence(row['bts'][1:-1], skip_rate=sr, sample_type='avg_sample') #采样周期是：2*skip_rate
+        hrs = parse_sequence(row['hrs'][1:-1], skip_rate=sr, sample_type='avg_sample')
+        dbp = parse_sequence(row['dbp'][1:-1], skip_rate=sr, sample_type='avg_sample')
+        mbp = parse_sequence(row['mbp'][1:-1], skip_rate=sr, sample_type='avg_sample')
+        prediction_mbp = parse_sequence(row['prediction_mbp'][1:-1], skip_rate=sr, sample_type='avg_sample')
         # print(len(bts), len(hrs), len(dbp), len(mbp), len(prediction_mbp))
         if len(bts) != context_len or len(hrs) != context_len or len(dbp) != context_len or\
             len(mbp) != context_len or len(prediction_mbp) != horizon_len:

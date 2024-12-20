@@ -331,8 +331,9 @@ def finetune(
     key, init_key = jax.random.split(key)
 
     def process_train_batch(batch):
-        past_ts = batch[0].reshape(batch_size * len(ts_cols), -1)
-        actual_ts = batch[3].reshape(batch_size * len(ts_cols), -1)
+        # 直接按batch_size来划分，应该是有问题的，因为有时候不到一个batch_size,所以修改为len(batch[0][0])
+        past_ts = batch[0].reshape(len(batch[0][0]) * len(ts_cols), -1)
+        actual_ts = batch[3].reshape(len(batch[0][0]) * len(ts_cols), -1)
         return NestedMap(input_ts=past_ts, actual_ts=actual_ts)
 
     def process_eval_batch(batch):

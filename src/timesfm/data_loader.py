@@ -24,7 +24,7 @@ import tensorflow as tf
 from . import time_features
 import os
 from collections import defaultdict
-
+PATCH_LEN=32
 
 class TimeSeriesdata(object):
   """Data loader class."""
@@ -315,7 +315,7 @@ class ioh_timeseriesdata(object):
               df_raw = pd.read_csv(os.path.join(self.root_path, str(self.data_path) + '_val.csv'))
           elif self.flag == 'test':
               df_raw = pd.read_csv(os.path.join(self.root_path, str(self.data_path) + '_test.csv'))
-          df_raw = df_raw.sample(frac=1, random_state=42).reset_index(drop=True)
+          # df_raw = df_raw.sample(frac=1, random_state=42).reset_index(drop=True)
       else:
           if self.flag == 'train':
               df_raw = pd.read_csv(os.path.join(self.root_path, 'vitaldb_train_data.csv'))
@@ -385,11 +385,11 @@ class ioh_timeseriesdata(object):
       for index, row in data.iterrows():
           # if index > 100:
           #     break
-          bts = parse_sequence(row['bts'][1:-1], skip_rate=0, sample_type='skip_sample') #采样周期是：2*skip_rate
-          hrs = parse_sequence(row['hrs'][1:-1], skip_rate=0, sample_type='skip_sample')
-          dbp = parse_sequence(row['dbp'][1:-1], skip_rate=0, sample_type='skip_sample')
-          mbp = parse_sequence(row['mbp'][1:-1], skip_rate=0, sample_type='skip_sample')
-          prediction_mbp = parse_sequence(row['prediction_mbp'][1:-1], skip_rate=0, sample_type='skip_sample')
+          bts = parse_sequence(row['bts'][1:-1], skip_rate=0, sample_type='avg_sample') #采样周期是：2*skip_rate
+          hrs = parse_sequence(row['hrs'][1:-1], skip_rate=0, sample_type='avg_sample')
+          dbp = parse_sequence(row['dbp'][1:-1], skip_rate=0, sample_type='avg_sample')
+          mbp = parse_sequence(row['mbp'][1:-1], skip_rate=0, sample_type='avg_sample')
+          prediction_mbp = parse_sequence(row['prediction_mbp'][1:-1], skip_rate=0, sample_type='avg_sample')
           # print(len(bts), len(hrs), len(dbp), len(mbp), len(prediction_mbp))
           if len(bts) != self.seq_len or len(hrs) != self.seq_len or len(dbp) != self.seq_len or\
               len(mbp) != self.seq_len or len(prediction_mbp) != self.label_len:
@@ -456,13 +456,13 @@ class ioh_timeseriesdata(object):
     for k, v in bs_data.items():
       if k == "mbp":
         for i in range(len(v)):
-          bts_train.append(v[i][-448:])
+          bts_train.append(v[i][(self.seq_len%PATCH_LEN - self.seq_len):])
         # bfeats_train = bts_train
         # bcf_train = bts_train
         
       elif k == "prediction_mbp":
         for i in range(len(v)):
-          bts_pred.append(v[i][:128])
+          bts_pred.append(v[i][:self.label_len - self.label_len%PATCH_LEN])
         # bfeats_pred = bts_pred
         # bcf_pred = bts_pred
       
