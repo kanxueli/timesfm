@@ -11,8 +11,4 @@ CUDA_VISIBLE_DEVICES=4 python3 test_finetuned_timesfm.py \
  --horizon-len=150 \
  --context-len=450 \
  --batch-size=1 \
- --use-lora \
- --lora-rank=2 \
- --lora-target-modules="all" \
- --adapter-path="./checkpoints/ft_lora" \
 

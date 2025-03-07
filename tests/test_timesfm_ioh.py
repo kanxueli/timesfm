@@ -208,30 +208,30 @@ def test_timesfm(
     data_path: Annotated[str, typer.Option(help="Path to dataset csv")]='/home/likx/time_series_forecasting/IOH_Datasets_Preprocess/vitaldb/vitaldb_test_data.csv',
 ):
     # # Loading TimesFM in pytorch version
-    # tfm = timesfm.TimesFm(
-    #     hparams=timesfm.TimesFmHparams(
-    #         backend="gpu",
-    #         per_core_batch_size=32,      
-    #         horizon_len=horizon_len,
-    #     ),
-    #     checkpoint=timesfm.TimesFmCheckpoint(
-    #         version="torch",
-    #         path=checkpoint_path),
-    # )
-    # print("Loading Model Finish.")
-
-    # # Loading TimesFM in pax/jax version
     tfm = timesfm.TimesFm(
-      hparams=timesfm.TimesFmHparams(
-        backend="gpu",
-        per_core_batch_size=32,      
-        horizon_len=horizon_len,
-      ),
-      checkpoint=timesfm.TimesFmCheckpoint(
-         version="jax",
-         step=1100000,
-         path="/home/likx/time_series_forecasting/datasets_and_checkpoints/timesfm-1.0-200m/checkpoints/"),
+        hparams=timesfm.TimesFmHparams(
+            backend="gpu",
+            per_core_batch_size=32,      
+            horizon_len=horizon_len,
+        ),
+        checkpoint=timesfm.TimesFmCheckpoint(
+            version="torch",
+            path=checkpoint_path),
     )
+    print("Loading Model Finish.")
+
+    # # # Loading TimesFM in pax/jax version
+    # tfm = timesfm.TimesFm(
+    #   hparams=timesfm.TimesFmHparams(
+    #     backend="gpu",
+    #     per_core_batch_size=32,      
+    #     horizon_len=horizon_len,
+    #   ),
+    #   checkpoint=timesfm.TimesFmCheckpoint(
+    #      version="jax",
+    #      step=1100000,
+    #      path="/home/likx/time_series_forecasting/datasets_and_checkpoints/timesfm-1.0-200m/checkpoints/"),
+    # )
 
     # Benchmark
     if is_instance_setting:

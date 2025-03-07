@@ -20,6 +20,7 @@ import dataclasses
 from typing import Optional, Tuple
 
 import einshape as es
+import jax
 from jax import lax
 import jax.numpy as jnp
 from praxis import base_layer
@@ -361,7 +362,9 @@ class PatchedTimeSeriesDecoder(base_layer.BaseLayer):
                                 q=num_outputs,
                                 h=self.horizon_len)
     return self._reverse_transform(output_ts, stats)
-
+  
+  # 这里是主干网络输出的tokens，还没到最终解码输出，先调用完__call__后
+  # 调用compute_predictions，见base_model.py
   def __call__(self, inputs: NestedMap) -> NestedMap:
     """PatchTST call.
 
@@ -374,7 +377,7 @@ class PatchedTimeSeriesDecoder(base_layer.BaseLayer):
       A nested map with two keys:
       (1) 'output_tokens' of shape [B, N, D].
       (2) 'output_ts' of shape [B, N, H, Q]
-      (3) 'stats' a Tuple of statistics for renormalization.
+      (3) 'stats' a Tuple of statistics for renormalization. 标准化和去标准化的数据统计属性
     """
     input_ts, input_padding = inputs[_INPUT_TS], inputs[_INPUT_PADDING]
     num_outputs = len(self.quantiles) + 1
@@ -484,7 +487,7 @@ class PatchedDecoderFinetuneModel(base_model.BaseModel):
     core_layer_tpl: config for core layer.
     freq: freq to finetune on.
   """
-
+  # Initializing finetunemodel by timesfm struct(network)
   core_layer_tpl: LayerTpl = template_field(PatchedTimeSeriesDecoder)
   freq: int = 0
 
@@ -495,7 +498,7 @@ class PatchedDecoderFinetuneModel(base_model.BaseModel):
 
   def compute_predictions(self, input_batch: NestedMap) -> NestedMap:
     input_ts = input_batch[_INPUT_TS]
-    input_padding = jnp.zeros_like(input_ts)
+    input_padding = jnp.zeros_like(input_ts) # 创建padding矩阵
     context_len = input_ts.shape[1]
     input_patch_len = self.core_layer_tpl.patch_len
     context_pad = ((context_len + input_patch_len - 1) //
@@ -510,6 +513,8 @@ class PatchedDecoderFinetuneModel(base_model.BaseModel):
         input_padding=input_padding,
         freq=freq,
     )
+    # generating using timesfm, and then call compute_loss function 
+    # 调用父类PatchedTimeSeriesDecoder的__call__函数进行推理
     return self.core_layer(new_input_batch)
 
   def _quantile_loss(self, pred: JTensor, actual: JTensor,
@@ -529,15 +534,63 @@ class PatchedDecoderFinetuneModel(base_model.BaseModel):
     loss_second = -dev * (1.0 - quantile)
     return 2 * jnp.where(loss_first >= 0, loss_first, loss_second)
 
+  # def _compute_self_supervised_learning_loss(self, input_batch, masking_rate=0.25):
+  #   input_ts = input_batch[_INPUT_TS] # shape=[batch_size, Time_series_data]
+  #   # 1. masking input times series
+
+  #   # 2. reconstructing by timesfm
+
+  #   # 3. counting reconstucting MSE loss
+
+  #   # 4. return ssl_loss
+
+  def _compute_self_supervised_learning_loss(self, input_batch, masking_rate=0.25):
+      input_ts = input_batch[_INPUT_TS]  # shape=[batch_size, Time_series_data]
+      
+      # 1. 创建掩码操作
+      batch_size, seq_length = input_ts.shape
+      key = jax.random.PRNGKey(0)  # 创建随机种子
+      # jax.random.normal是正态分布的随机数，jax.random.uniform是均匀分布的随机数
+      mask = jax.random.uniform(key, shape=(batch_size, seq_length)) < masking_rate  # 随机掩码
+      masked_input = jnp.where(mask, PAD_VAL, input_ts)  # 将掩码部分设置为PAD_VAL
+      
+      # 2. 通过模型进行重建
+      # 使用掩码后的输入进行模型推理
+      freq = jnp.ones([input_ts.shape[0], 1], dtype=jnp.int32) * self.freq
+      input_padding = jnp.where(mask, 1, 0)  # 对应的padding值为1，表示这些位置需要掩码
+      masked_input_batch = NestedMap(
+          input_ts=masked_input,
+          input_padding=input_padding,
+          freq=freq,
+      )
+
+      # 调用模型进行预测
+      predicted_output = self.core_layer(masked_input_batch)[_OUTPUT_TS]  # 模型的输出
+      
+      # 3. 计算重建误差：均方误差（MSE）损失
+      # 取出重建的输出，并与原始时间序列进行比较（去除掩码部分）
+      mse_loss = jnp.mean(jnp.square(predicted_output - input_ts))
+      
+      # 4. 返回自监督学习损失（SSL Loss）
+      return mse_loss
+
   def compute_loss(self, prediction_output: NestedMap,
                    input_batch: NestedMap) -> Tuple[NestedMap, NestedMap]:
-    output_ts = prediction_output[_OUTPUT_TS]
-    actual_ts = input_batch[_TARGET_FUTURE]
+    output_ts = prediction_output[_OUTPUT_TS] # shape=[batch_size, N(the number of input patches), out_length, Q(number of output logits)] (32, 14, 128, 10)
+    actual_ts = input_batch[_TARGET_FUTURE] # shape=[batch_size, label_length]
+    # input_ts = input_batch[_INPUT_TS] #shape=[batch_size, historical_length]
+
+    # counting forecasting loss
     pred_ts = output_ts[:, -1, 0:actual_ts.shape[1], :]
     loss = jnp.square(pred_ts[:, :, 0] - actual_ts) # MSE Loss
     for i, quantile in enumerate(self.core_layer.quantiles):
       loss += self._quantile_loss(pred_ts[:, :, i + 1], actual_ts, quantile)
     loss = loss.mean()
+
+    # counting self-supervised learning loss
+    # ssl_loss = self._compute_self_supervised_learning_loss(input_batch)
+    # loss = loss + ssl_loss
+
     loss_weight = jnp.array(1.0, dtype=jnp.float32)
     per_example_out = NestedMap()
     return {"avg_qloss": (loss, loss_weight)}, per_example_out

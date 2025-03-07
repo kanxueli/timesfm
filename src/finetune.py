@@ -313,7 +313,7 @@ def finetune(
         name="ts-learn",
         model=model,
         train=tasks_lib.SingleTask.Train(
-            learner=build_learner(),
+            learner=build_learner(), # HParams to control how this task should be trained.
         ),
     )
 
@@ -424,7 +424,8 @@ def finetune(
                 "avg_val_loss": avg_eval_loss,
             }
         )
-
+        
+        # Saving checkpoint 
         if avg_eval_loss < best_eval_loss or np.isnan(avg_eval_loss):
             best_eval_loss = avg_eval_loss
             print("Saving checkpoint.")

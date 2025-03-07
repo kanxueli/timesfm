@@ -160,6 +160,12 @@ def get_batched_data_fn(
             len(mbp) != context_len or len(prediction_mbp) != horizon_len:
             continue
         
+        if (np.abs(np.diff(mbp)) > 30).any() or (np.abs(np.diff(prediction_mbp)) > 30).any():
+            continue
+
+        # if np.mean(mbp) > 100 or np.mean(prediction_mbp) > 100:
+        #     continue
+
         examples['caseid'].append(row['caseid'])
         examples['stime'].append(row['stime'])
         examples['ioh_stime'].append(row['ioh_stime'])

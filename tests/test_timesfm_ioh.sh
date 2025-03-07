@@ -10,7 +10,7 @@ CUDA_VISIBLE_DEVICES=4 python3 test_timesfm_ioh.py \
     --checkpoint-path="/home/data/times-forecasting/checkpoints/timesfm-1.0-200m-pytorch/torch_model.ckpt" \
     --horizon-len=150 \
     --context-len=450 \
-    --batch-size=1 \
+    --batch-size=128 \
     --data-path="/home/likx/time_series_forecasting/IOH_Datasets_Preprocess/vitaldb/Instance_Level_Dataset_FineGrained" \
 
 # done
